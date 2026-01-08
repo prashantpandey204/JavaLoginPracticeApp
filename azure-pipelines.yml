@@ -15,95 +15,96 @@ variables:
   REPO_URL: https://github.com/prashantpandey204/JavaLoginPracticeApp.git
   BACKUP_DIR: /opt/tomcat9/webapps/backup
 
-jobs:
-
+stages:
+-  stage:
+   jobs:
 # 1️⃣ Pre-Requisites Job
-- job: PreReq
-  displayName: 'Install Pre-requisites'
-  steps:
-    - script: |
-        echo "Installing Java, Maven, Git, wget..."
-        sudo apt update
-        sudo apt install -y openjdk-11-jdk maven git wget curl
-      displayName: 'Install Java, Maven, Git'
+    - job: PreReq
+      displayName: 'Install Pre-requisites'
+      steps:
+        - script: |
+            echo "Installing Java, Maven, Git, wget..."
+            sudo apt update
+            sudo apt install -y openjdk-11-jdk maven git wget curl
+          displayName: 'Install Java, Maven, Git'
 
-# 2️⃣ Tomcat Install & Stop Job
-- job: TomcatSetup
-  displayName: 'Tomcat Install & Stop'
-  dependsOn: PreReq
-  steps:
-    - script: |
-        if [ ! -d "$TOMCAT_HOME" ]; then
-          echo "Installing Tomcat 9..."
-          cd /opt
-          sudo wget https://archive.apache.org/dist/tomcat/tomcat-9/v9.0.85/bin/apache-tomcat-9.0.85.tar.gz
-          sudo tar -xvzf apache-tomcat-9.0.85.tar.gz
-          sudo mv apache-tomcat-9.0.85 tomcat9
-          sudo chown -R $(whoami):$(whoami) $TOMCAT_HOME
-        else
-          echo "Tomcat already installed"
-        fi
-      displayName: 'Install Tomcat 9'
-    
-    - script: |
-        echo "Stopping Tomcat if running..."
-        $TOMCAT_HOME/bin/shutdown.sh || true
-        sleep 5
-      displayName: 'Stop Tomcat'
+    # 2️⃣ Tomcat Install & Stop Job
+    - job: TomcatSetup
+      displayName: 'Tomcat Install & Stop'
+      dependsOn: PreReq
+      steps:
+        - script: |
+            if [ ! -d "$TOMCAT_HOME" ]; then
+              echo "Installing Tomcat 9..."
+              cd /opt
+              sudo wget https://archive.apache.org/dist/tomcat/tomcat-9/v9.0.85/bin/apache-tomcat-9.0.85.tar.gz
+              sudo tar -xvzf apache-tomcat-9.0.85.tar.gz
+              sudo mv apache-tomcat-9.0.85 tomcat9
+              sudo chown -R $(whoami):$(whoami) $TOMCAT_HOME
+            else
+              echo "Tomcat already installed"
+            fi
+          displayName: 'Install Tomcat 9'
+        
+        - script: |
+            echo "Stopping Tomcat if running..."
+            $TOMCAT_HOME/bin/shutdown.sh || true
+            sleep 5
+          displayName: 'Stop Tomcat'
 
-# 3️⃣ Backup Old WAR Job
-- job: Backup
-  displayName: 'Backup Old WAR'
-  dependsOn: TomcatSetup
-  steps:
-    - script: |
-        mkdir -p $BACKUP_DIR
-        if [ -f $TOMCAT_HOME/webapps/$APP_WAR_NAME ]; then
-          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-          mv $TOMCAT_HOME/webapps/$APP_WAR_NAME $BACKUP_DIR/${APP_WAR_NAME%.war}-$TIMESTAMP.war
-          echo "Old WAR backed up"
-        else
-          echo "No old WAR to backup"
-        fi
-      displayName: 'Backup WAR'
+    # 3️⃣ Backup Old WAR Job
+    - job: Backup
+      displayName: 'Backup Old WAR'
+      dependsOn: TomcatSetup
+      steps:
+        - script: |
+            mkdir -p $BACKUP_DIR
+            if [ -f $TOMCAT_HOME/webapps/$APP_WAR_NAME ]; then
+              TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+              mv $TOMCAT_HOME/webapps/$APP_WAR_NAME $BACKUP_DIR/${APP_WAR_NAME%.war}-$TIMESTAMP.war
+              echo "Old WAR backed up"
+            else
+              echo "No old WAR to backup"
+            fi
+          displayName: 'Backup WAR'
 
-# 4️⃣ Git Clone & Build Job
-- job: Build
-  displayName: 'Clone Repo & Build WAR'
-  dependsOn: Backup
-  steps:
-    - script: |
-        if [ -d ~/JavaLoginPracticeApp ]; then
-          rm -rf ~/JavaLoginPracticeApp
-        fi
-        git clone $(REPO_URL)
-      displayName: 'Clone Git Repository'
+    # 4️⃣ Git Clone & Build Job
+    - job: Build
+      displayName: 'Clone Repo & Build WAR'
+      dependsOn: Backup
+      steps:
+        - script: |
+            if [ -d ~/JavaLoginPracticeApp ]; then
+              rm -rf ~/JavaLoginPracticeApp
+            fi
+            git clone $(REPO_URL)
+          displayName: 'Clone Git Repository'
 
-    - script: |
-        cd ~/JavaLoginPracticeApp
-        mvn clean package -B
-      displayName: 'Build WAR'
+        - script: |
+            cd ~/JavaLoginPracticeApp
+            mvn clean package -B
+          displayName: 'Build WAR'
 
-# 5️⃣ Deploy WAR & Start Tomcat Job
-- job: Deploy
-  displayName: 'Deploy WAR & Start Tomcat'
-  dependsOn: Build
-  steps:
-    - script: |
-        cp ~/JavaLoginPracticeApp/target/$APP_WAR_NAME $TOMCAT_HOME/webapps/
-        echo "WAR deployed"
-      displayName: 'Deploy WAR'
+    # 5️⃣ Deploy WAR & Start Tomcat Job
+    - job: Deploy
+      displayName: 'Deploy WAR & Start Tomcat'
+      dependsOn: Build
+      steps:
+        - script: |
+            cp ~/JavaLoginPracticeApp/target/$APP_WAR_NAME $TOMCAT_HOME/webapps/
+            echo "WAR deployed"
+          displayName: 'Deploy WAR'
 
-    - script: |
-        $TOMCAT_HOME/bin/startup.sh
-        sleep 10
-      displayName: 'Start Tomcat'
+        - script: |
+            $TOMCAT_HOME/bin/startup.sh
+            sleep 10
+          displayName: 'Start Tomcat'
 
-    - script: |
-        if curl -s http://localhost:8080/$APP_NAME-1.0.0/index.html > /dev/null; then
-          echo "Deployment successful!"
-        else
-          echo "Deployment failed!"
-          exit 1
-        fi
-      displayName: 'Verify Deployment'
+        - script: |
+            if curl -s http://localhost:8080/$APP_NAME-1.0.0/index.html > /dev/null; then
+              echo "Deployment successful!"
+            else
+              echo "Deployment failed!"
+              exit 1
+            fi
+          displayName: 'Verify Deployment'
